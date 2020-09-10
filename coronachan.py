@@ -1,38 +1,48 @@
 import json
 import os
-import requests
 import sys
 import urllib.parse
+import urllib3
 
-token = os.environ['TOKEN'] 
-cookie = os.environ['COOKIE'] 
-slack = os.environ['SLACK'] 
 
-resp = requests.get(
-    'https://api.coronatracker.com/v3/stats/worldometer/country?countryCode=MY')
-total = resp.json()[0]["totalConfirmed"] + 1
-profile = requests.get(
-    'https://slack.com/api/users.profile.get?token=' + token + '&pretty=1', headers={"cookie": cookie})
-if profile.json()["ok"] == False:
-    sys.exit("Error getting profile!")
-title = profile.json()["profile"]["title"]
-status = profile.json()["profile"]["status_text"]
-current = int("".join(filter(str.isdigit, title)))
-if total > current:
-    # update
-    newProfile = {"title": "编号" +
-              str(total), "status_text": "编号#" + str(total), }
-    queryObj = {'token': token,
+def handler(event, context):
+    return {
+        'message': coronachan()
+    }
+
+
+def coronachan():
+    token = os.environ['TOKEN'] 
+    cookie = os.environ['COOKIE'] 
+    slack = os.environ['SLACK'] 
+    http = urllib3.PoolManager()
+
+    r = http.request('GET', 'https://api.coronatracker.com/v3/stats/worldometer/country?countryCode=MY')
+    if r.status != 200 or len(json.loads(r.data.decode('utf-8'))) != 1:
+        return("Error getting corona data")
+    coronaData = json.loads(r.data.decode('utf-8'))
+    total = coronaData[0]["totalConfirmed"] + 1
+    p = http.request('GET', 'https://slack.com/api/users.profile.get?token=' + token + '&pretty=1', headers={"cookie": cookie})
+    profile = json.loads(p.data.decode('utf-8'))
+    if r.status != 200 or profile["ok"] == False:
+        return("Error getting corona data")
+    title = profile["profile"]["title"]
+    current = int("".join(filter(str.isdigit, title)))
+    if total > current:
+        # update
+        newProfile = {"title": "编号#" +
+                        str(total), "status_text": "编号#" + str(total), }
+        queryObj = {'token': token,
                     'profile': str(newProfile),
                     'pretty': 1}
-    qs = urllib.parse.urlencode(queryObj, quote_via=urllib.parse.quote)
-    update = requests.post('https://slack.com/api/users.profile.set?' + qs, headers={"cookie": cookie})
-    if update.status_code != 200 or update.json()["ok"] == False:
-        sys.exit("Error updating profile!")
-    #slack notification
-    slackObj = {"text": "BB is now 编号#"+ str(total)}
-    jsonStr = json.dumps(slackObj)
-    slack = requests.post(slack, data = jsonStr)
-    print("Updated slack status")
-    exit()
-print("Slack status up to date")
+        qs = urllib.parse.urlencode(queryObj, quote_via=urllib.parse.quote)
+        u = http.request('POST', 'https://slack.com/api/users.profile.set?' + qs, headers={"cookie": cookie})
+        if u.status != 200:
+            return("Error updating profile")
+        # slack notification
+        slackObj = {"text": "BB is now 编号#" + str(total)}
+        jsonStr = json.dumps(slackObj)
+        s = http.request('POST', slack, body=jsonStr)
+        if s.status != 200:
+            return("Error sending slack notification")
+    return("Slack status up to date")
