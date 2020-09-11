@@ -40,7 +40,23 @@ def coronachan():
         if u.status != 200:
             return("Error updating profile")
         # slack notification
-        slackObj = {"text": "BB is now 编号#" + str(total)}
+        slackObj = {"text": "BB is now 编号#" + str(total),
+                    "blocks": [
+                        {
+                            "type": "section",
+                            "block_id": "section567",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": "BB is now 编号#" + str(total) + "\n Total Confirmed: " + str(total - 1) + " (+" + str(coronaData[0]["dailyConfirmed"]) + ") \n Total Death: " + str(coronaData[0]["totalDeaths"]) + " (+" + str(coronaData[0]["dailyDeaths"]) + ") \n Total Active: " + str(coronaData[0]["activeCases"])
+                            },
+                            "accessory": {
+                                "type": "image",
+                                "image_url": "https://www.infosihat.gov.my/images/media_sihat/infografik/jpeg/CONFIRM%20CASE%20BY%20STATE.jpg",
+                                "alt_text": "coronachan status"
+                            }
+                        }
+                    ]              
+                }
         jsonStr = json.dumps(slackObj)
         s = http.request('POST', slack, body=jsonStr)
         if s.status != 200:
