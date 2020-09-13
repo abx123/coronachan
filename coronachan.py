@@ -4,39 +4,65 @@ import sys
 import urllib.parse
 import urllib3
 
-
 def handler(event, context):
     return {
         'message': coronachan()
     }
 
-
 def coronachan():
-    token = os.environ['TOKEN'] 
-    cookie = os.environ['COOKIE'] 
+    twitterToken = os.environ['TWITTERTOKEN'] 
+    twitterCookie = os.environ['TWITTERCOOKIE'] 
+    slackToken = os.environ['SLACKTOKEN']  
+    slackCookie = os.environ['SLACKCOOKIE']  
     slack = os.environ['SLACK'] 
     http = urllib3.PoolManager()
 
-    r = http.request('GET', 'https://api.coronatracker.com/v3/stats/worldometer/country?countryCode=MY')
-    if r.status != 200 or len(json.loads(r.data.decode('utf-8'))) != 1:
+
+    queryObj = {'tweet_mode': "extended"}
+    qs = urllib.parse.urlencode(queryObj, quote_via=urllib.parse.quote)
+    t = http.request('GET', 'https://api.twitter.com/2/timeline/profile/531041640.json?' +
+                    qs, headers={"cookie": twitterCookie, "authorization": twitterToken, "host": "api.twitter.com", "x-csrf-token": "cdad10dbdd00df5a29bd886eebe4653a"})
+    tweet = json.loads(t.data.decode('utf-8'))
+    if t.status != 200:
         return("Error getting corona data")
-    coronaData = json.loads(r.data.decode('utf-8'))
-    total = coronaData[0]["totalConfirmed"] + 1
-    p = http.request('GET', 'https://slack.com/api/users.profile.get?token=' + token + '&pretty=1', headers={"cookie": cookie})
+    tweets = tweet["globalObjects"]["tweets"]
+    for tweet in tweets:
+        if tweets[tweet]["full_text"].startswith('Terkini #COVID19Malaysia'):
+            totalStr = tweets[tweet]["full_text"].partition(
+                "Jumlah positif= ")[2].partition("Kes kematian=")[0]
+            total =  int("".join(filter(str.isdigit, totalStr))) + 1
+            newStr =  tweets[tweet]["full_text"].partition(
+                "Kes positif= ")[2].partition("kes import")[0]
+            new = int("".join(filter(str.isdigit, newStr)))
+            deathStr = tweets[tweet]["full_text"].partition(
+                "Kes kematian= ")[2].partition("Jumlah kes kematian")[0]
+            death = int("".join(filter(str.isdigit, deathStr)))
+            totalDeathStr = tweets[tweet]["full_text"].partition(
+                "Jumlah kes kematian= ")[2].partition("Kes dirawat di ICU")[0]
+            totalDeath = int("".join(filter(str.isdigit, totalDeathStr)))
+            totalRecoveredStr =  tweets[tweet]["full_text"].partition(
+                "Jumlah kes sembuh= ")[2].partition("Kes positif")[0]
+            totalRecovered = int("".join(filter(str.isdigit, totalRecoveredStr)))
+            recoveredStr =  tweets[tweet]["full_text"].partition(
+                "Kes sembuh=")[2].partition("Jumlah kes sembuh")[0]
+            recovered = int("".join(filter(str.isdigit, recoveredStr)))
+            active = total - totalRecovered - totalDeath
+            pic = tweets[tweet]["entities"]["media"][0]["media_url"]
+    p = http.request('GET', 'https://slack.com/api/users.profile.get?token=' + slackToken + '&pretty=1', headers={"cookie": slackCookie})
     profile = json.loads(p.data.decode('utf-8'))
-    if r.status != 200 or profile["ok"] == False:
-        return("Error getting corona data")
+    if p.status != 200 or profile["ok"] == False:
+        return("Error getting current slack status")
     title = profile["profile"]["title"]
     current = int("".join(filter(str.isdigit, title)))
     if total > current:
         # update
         newProfile = {"title": "编号#" +
                         str(total), "status_text": "编号#" + str(total), }
-        queryObj = {'token': token,
+        queryObj = {'token': slackToken,
                     'profile': str(newProfile),
                     'pretty': 1}
         qs = urllib.parse.urlencode(queryObj, quote_via=urllib.parse.quote)
-        u = http.request('POST', 'https://slack.com/api/users.profile.set?' + qs, headers={"cookie": cookie})
+        u = http.request('POST', 'https://slack.com/api/users.profile.set?' + qs, headers={"cookie": slackCookie})
         if u.status != 200:
             return("Error updating profile")
         # slack notification
@@ -47,11 +73,11 @@ def coronachan():
                             "block_id": "section567",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": "BB is now 编号#" + str(total) + "\n Total Confirmed: " + str(total - 1) + " (+" + str(coronaData[0]["dailyConfirmed"]) + ") \n Total Death: " + str(coronaData[0]["totalDeaths"]) + " (+" + str(coronaData[0]["dailyDeaths"]) + ") \n Total Active: " + str(coronaData[0]["activeCases"])
+                                "text": "BB is now 编号#" + str(total) + "\n Total Confirmed: " + str(total - 1) + " (+" + str(new) + ") \n Total Death: " + str(totalDeath) + " (+" + str(death) + ") \n Total Recovered: " + str(totalRecovered) + " (+" + str(recovered) + ") \n Total Active: " + str(active)
                             },
                             "accessory": {
                                 "type": "image",
-                                "image_url": "https://www.infosihat.gov.my/images/media_sihat/infografik/jpeg/CONFIRM%20CASE%20BY%20STATE.jpg",
+                                "image_url": pic,
                                 "alt_text": "coronachan status"
                             }
                         }
