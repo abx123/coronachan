@@ -3,6 +3,8 @@ import os
 import sys
 import urllib.parse
 import urllib3
+from datetime import date
+
 
 def handler(event, context):
     return {
@@ -27,7 +29,8 @@ def coronachan():
         return("Error getting corona data")
     tweets = tweet["globalObjects"]["tweets"]
     for tweet in tweets:
-        if tweets[tweet]["full_text"].startswith('Terkini #COVID19Malaysia'):
+        if tweets[tweet]["full_text"].startswith('Terkini #COVID19Malaysia ' + date.today().strftime("%d")):
+
             totalStr = tweets[tweet]["full_text"].partition(
                 "Jumlah positif= ")[2].partition("Kes kematian=")[0]
             total =  int("".join(filter(str.isdigit, totalStr))) + 1
@@ -54,37 +57,38 @@ def coronachan():
         return("Error getting current slack status")
     title = profile["profile"]["title"]
     current = int("".join(filter(str.isdigit, title)))
-    if total > current:
-        # update
-        newProfile = {"title": "编号#" +
-                        str(total), "status_text": "编号#" + str(total), }
-        queryObj = {'token': slackToken,
-                    'profile': str(newProfile),
-                    'pretty': 1}
-        qs = urllib.parse.urlencode(queryObj, quote_via=urllib.parse.quote)
-        u = http.request('POST', 'https://slack.com/api/users.profile.set?' + qs, headers={"cookie": slackCookie})
-        if u.status != 200:
-            return("Error updating profile")
-        # slack notification
-        slackObj = {"text": "BB is now 编号#" + str(total),
-                    "blocks": [
-                        {
-                            "type": "section",
-                            "block_id": "section567",
-                            "text": {
-                                "type": "mrkdwn",
-                                "text": "BB is now 编号#" + str(total) + "\n Total Confirmed: " + str(total - 1) + " (+" + str(new) + ") \n Total Death: " + str(totalDeath) + " (+" + str(death) + ") \n Total Recovered: " + str(totalRecovered) + " (+" + str(recovered) + ") \n Total Active: " + str(active)
-                            },
-                            "accessory": {
-                                "type": "image",
-                                "image_url": pic,
-                                "alt_text": "coronachan status"
-                            }
+    if total <= current:
+            return("Slack status up to date")
+    # update
+    newProfile = {"title": "编号#" +
+                    str(total), "status_text": "编号#" + str(total), }
+    queryObj = {'token': slackToken,
+                'profile': str(newProfile),
+                'pretty': 1}
+    qs = urllib.parse.urlencode(queryObj, quote_via=urllib.parse.quote)
+    u = http.request('POST', 'https://slack.com/api/users.profile.set?' + qs, headers={"cookie": slackCookie})
+    if u.status != 200:
+        return("Error updating profile")
+    # slack notification
+    slackObj = {"text": "BB is now 编号#" + str(total),
+                "blocks": [
+                    {
+                        "type": "section",
+                        "block_id": "section567",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "BB is now 编号#" + str(total) + "\n Total Confirmed: " + str(total - 1) + " (+" + str(new) + ") \n Total Death: " + str(totalDeath) + " (+" + str(death) + ") \n Total Recovered: " + str(totalRecovered) + " (+" + str(recovered) + ") \n Total Active: " + str(active)
+                        },
+                        "accessory": {
+                            "type": "image",
+                            "image_url": pic,
+                            "alt_text": "coronachan status"
                         }
-                    ]              
-                }
-        jsonStr = json.dumps(slackObj)
-        s = http.request('POST', slack, body=jsonStr)
-        if s.status != 200:
-            return("Error sending slack notification")
-    return("Slack status up to date")
+                    }
+                ]              
+            }
+    jsonStr = json.dumps(slackObj)
+    s = http.request('POST', slack, body=jsonStr)
+    if s.status != 200:
+        return("Error sending slack notification")
+    return('Updated slack status')
