@@ -80,12 +80,6 @@ def infographic():
 
 
 def coronachan():
-    # twitterToken = os.environ['TWITTERTOKEN'] 
-    # twitterCookie = os.environ['TWITTERCOOKIE'] 
-    # slackToken = os.environ['SLACKTOKEN']  
-    # slackCookie = os.environ['SLACKCOOKIE']  
-    # slack = os.environ['SLACK']
-    # http = urllib3.PoolManager()
     queryObj = {'tweet_mode': "extended"}
     qs = urllib.parse.urlencode(queryObj, quote_via=urllib.parse.quote)
     t = http.request('GET', 'https://api.twitter.com/2/timeline/profile/531041640.json?' +
@@ -124,7 +118,6 @@ def coronachan():
     title = profile["profile"]["title"]
     current = int("".join(filter(str.isdigit, title)))
     if total <= current:
-            infographic()
             return("Slack status up to date")
     # update
     newProfile = {"title": "编号#" +
