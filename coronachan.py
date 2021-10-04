@@ -45,7 +45,7 @@ def crawlKKM():
     tweets = tweet["globalObjects"]["tweets"]
 
     for tweet in tweets:
-        if ((date.today().strftime("%#d") + ' ' +  month[int(date.today().strftime("%#m"))] in tweets[tweet]["full_text"]  and 'Sehinga' and 'Jumlah kes COVID-19'in tweets[tweet]["full_text"])):
+        if ((date.today().strftime("%#d") + ' ' +  month[int(date.today().strftime("%#m"))] in tweets[tweet]["full_text"]  and 'Sehingga' and 'Jumlah kes COVID-19'in tweets[tweet]["full_text"])):
             newStr = tweets[tweet]["full_text"].split("dilaporkan adalah")[1].split(".")[0].split("(")[0]
             totalStr = tweets[tweet]["full_text"].split("dilaporkan adalah")[1].split(".")[0].split("(")[1]
             

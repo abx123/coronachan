@@ -1,2 +1,3 @@
-*.zip
-coronachan2.py
+*
+!.gitignore
+!coronachan.py
